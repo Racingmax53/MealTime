@@ -1,0 +1,31 @@
+{% extends "base.html" %}
+
+{% block title %}
+    Recipe Details
+{% endblock %}
+
+{% block content %}
+    <div class="container my-5">
+        <h1 class="text-center mb-5">{{ title }}</h1>
+        <div class="row justify-content-center">
+            <div class="col-md-8">
+                <h3>Ingredients:</h3>
+                <ul class="list-group">
+                    {% for ingredient in recipe.ingredients %}
+                        <li class="list-group-item">{{ ingredient }}</li>
+                    {% endfor %}
+                </ul>
+            </div>
+        </div>
+        <div class="row justify-content-center mt-5">
+            <div class="col-md-8">
+                <h3>Instructions:</h3>
+                <ol class="list-group">
+                    {% for step in recipe.instructions %}
+                        <li class="list-group-item">{{ step }}</li>
+                    {% endfor %}
+                </ol>
+            </div>
+        </div>
+    </div>
+{% endblock %}

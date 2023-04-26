@@ -1,5 +1,44 @@
 {% extends "base.html" %}
-{% block title %}Recipes --MealTime--{% endblock %}
+
+{% block title %}
+    Recipe Search
+{% endblock %}
+
 {% block content %}
-<h1 align="center">Browse our selection of recipes!</h1>
+    <div class="container my-5">
+        <h1 class="text-center mb-5">Recipe Search</h1>
+        <div class="row justify-content-center">
+            <div class="col-md-6">
+                <form action="/search" method="GET">
+                    <div class="input-group mb-3">
+                        <input type="text" class="form-control" placeholder="Search recipes" name="q">
+                        <div class="input-group-append">
+                            <button class="btn btn-primary" type="submit">Search</button>
+                        </div>
+                    </div>
+                </form>
+            </div>
+        </div>
+        <div class="row justify-content-center">
+            <div class="col-md-8">
+                {% if recipes %}
+                    <div class="list-group">
+                        {% for recipe in recipes %}
+                            <a href="{{ recipe.url }}" class="list-group-item list-group-item-action">
+                                <h5 class="mb-1">{{ recipe.title }}</h5>
+                                <p class="mb-1">{{ recipe.description }}</p>
+                            </a>
+                        {% endfor %}
+                    </div>
+                {% else %}
+                    <p class="text-center">No recipes found.</p>
+                {% endif %}
+            </div>
+        </div>
+        <div class="row justify-content-center mt-5">
+            <div class="col-md-6">
+                <a href="/create_recipe" class="btn btn-success btn-lg btn-block">Create Recipe</a>
+            </div>
+        </div>
+    </div>
 {% endblock %}

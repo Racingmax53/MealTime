@@ -1,4 +1,4 @@
-from flask import Flask, render_template, request, url_for, redirect
+from flask import Flask, render_template, request, url_for, redirect, session
 from pymongo.mongo_client import MongoClient
 import sys
 
@@ -14,6 +14,8 @@ userDB = client["MealTime"]
 mycol = userDB["users"]
 loggedIn = False;
 app = Flask(__name__)
+app.secret_key = 'your_secret_key_here'
+
 
 mydict = { "username": "Max", "password": "123" }
 
@@ -31,9 +33,11 @@ def checkCredentials(_fromDB, _username, _password):
 
 @app.route('/')
 def home():
-    if loggedIn:
+    if 'logged_in' in session and session['logged_in']:
+        # User is logged in
         return redirect(url_for("user", usr=user))
-    else: 
+    else:
+        # User is not logged in
         return redirect(url_for("login"))
 
 
@@ -49,6 +53,7 @@ def checkping():
 def login():
     if request.method == "POST":
         if request.form['button'] == 'Submit':
+            print('Submit Pressed', file=sys.stdout)
             # Get data from Username text field
             user = request.form["username"]
 
@@ -59,8 +64,9 @@ def login():
             nameQuery = { "username": user }
             mydoc = mycol.find(nameQuery)
             
+
             if checkCredentials(mydoc, user, password):
-                loggedIn = True
+                session['logged_in'] = True
                 return redirect(url_for("user", usr=user))
             else:
                 return redirect(url_for("login"))  
@@ -85,6 +91,14 @@ def user(usr):
 def recipes():
     return render_template("recipes.html")
 
+@app.route("/logout")
+def logout():
+    session['logged_in'] = False
+    return redirect(url_for("login"))
+
+@app.route("/displayrecipe")
+def displayrecipe():
+    return render_template("displayrecipe.html", title="Test")
 
 if __name__ == '__main__': 
     app.run(debug=True)
