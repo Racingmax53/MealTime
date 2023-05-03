@@ -24,7 +24,7 @@
                 {% if recipes %}
                     <div class="list-group">
                         {% for recipe in recipes %}
-                            <a href="{{ recipe.url }}" class="list-group-item list-group-item-action">
+                            <a href="/displayrecipe/{{ recipe._id }}" class="list-group-item list-group-item-action">
                                 <h5 class="mb-1">{{ recipe.title }}</h5>
                                 <p class="mb-1">{{ recipe.description }}</p>
                             </a>
@@ -37,7 +37,7 @@
         </div>
         <div class="row justify-content-center mt-5">
             <div class="col-md-6">
-                <a href="/create_recipe" class="btn btn-success btn-lg btn-block">Create Recipe</a>
+                <a href="/createrecipe" class="btn btn-success btn-lg btn-block">Create Recipe</a>
             </div>
         </div>
     </div>
