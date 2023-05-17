@@ -1,0 +1,83 @@
+{% extends "base.html" %}
+
+{% block content %}
+<style>
+  table {
+    width: 99%;
+    border-collapse: collapse;
+  }
+
+  th, td {
+    border: 1px solid black;
+    padding: 10px;
+    width: 100px;
+    text-align: center;
+  }
+
+  h1 {
+    text-align: center;
+  }
+
+  .button-container {
+    display: flex;
+    justify-content: center;
+    margin-top: 20px;
+  }
+
+  button {
+    display: block;
+    margin: 0 auto;
+  }
+</style>
+
+<h1>Weekly Meal Plan</h1>
+
+<table>
+  <tr>
+    <th></th>
+    <th>Monday</th>
+    <th>Tuesday</th>
+    <th>Wednesday</th>
+    <th>Thursday</th>
+    <th>Friday</th>
+    <th>Saturday</th>
+    <th>Sunday</th>
+  </tr>
+  <tr>
+    <th>Breakfast</th>
+    <td>{{ _mealplan[0] }}</td>
+    <td>{{ _mealplan[1] }}</td>
+    <td>{{ _mealplan[2] }}</td>
+    <td>{{ _mealplan[3] }}</td>
+    <td>{{ _mealplan[4] }}</td>
+    <td>{{ _mealplan[5] }}</td>
+    <td>{{ _mealplan[6] }}</td>
+  </tr>
+  <tr>
+    <th>Lunch</th>
+    <td>{{ _mealplan[7] }}</td>
+    <td>{{ _mealplan[8] }}</td>
+    <td>{{ _mealplan[9] }}</td>
+    <td>{{ _mealplan[10] }}</td>
+    <td>{{ _mealplan[11] }}</td>
+    <td>{{ _mealplan[12] }}</td>
+    <td>{{ _mealplan[13] }}</td>
+  </tr>
+  <tr>
+    <th>Dinner</th>
+    <td>{{ _mealplan[14] }}</td>
+    <td>{{ _mealplan[15] }}</td>
+    <td>{{ _mealplan[16] }}</td>
+    <td>{{ _mealplan[17] }}</td>
+    <td>{{ _mealplan[18] }}</td>
+    <td>{{ _mealplan[19] }}</td>
+    <td>{{ _mealplan[20] }}</td>
+  </tr>
+</table>
+
+<div class="button-container">
+  <form method="POST">
+    <button id="generate" type="submit" class="btn btn-primary btn-lg">Generate Meal Plan</button>
+  </form>
+</div>
+{% endblock %}

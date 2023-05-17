@@ -1,0 +1,29 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="container">
+  <div class="row">
+    <div class="col-md-6 offset-md-3">
+      <h2>Preferences</h2>
+      <form method="POST">
+        <div class="form-group">
+          <label for="pref">Select Preference:</label>
+          <div class="form-check">
+            <input class="form-check-input" type="radio" name="user_pref" id="none" value="{{ prefs[0] }}">
+            <label class="form-check-label" for="none">{{ prefs[0] }}</label>
+          </div>
+          <div class="form-check">
+            <input class="form-check-input" type="radio" name="user_pref" id="veg" value="{{ prefs[1] }}">
+            <label class="form-check-label" for="veg">{{ prefs[1] }}</label>
+          </div>
+          <div class="form-check">
+            <input class="form-check-input" type="radio" name="user_pref" id="pes" value="{{ prefs[2] }}">
+            <label class="form-check-label" for="pes">{{ prefs[2] }}</label>
+          </div>
+        </div>
+        <button type="submit" name="button" class="btn btn-primary">Submit</button>
+      </form>
+    </div>
+  </div>
+</div>
+{% endblock %}

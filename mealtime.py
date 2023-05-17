@@ -1,6 +1,6 @@
 from flask import Flask, render_template, request, url_for, redirect, session
 from pymongo.mongo_client import MongoClient
-import sys
+import sys, random
 
 # print('This is error output', file=sys.stderr)
 # print('This is standard output', file=sys.stdout)
@@ -16,115 +16,18 @@ loggedIn = False;
 app = Flask(__name__)
 app.secret_key = 'your_secret_key_here'
 
+collection_mealplan = userDB["mealplan"]
 
-# Dummy Data
+dummy_mealplan = [None] * 21
 
 
-# myCredentials = { "username": "Max", 
-#                 "password": "123" }
+dieteryprefs = ['none', 'vegetarian', 'pescatarian']
+global userPref 
+userPref = 'none'
 
-# ingredient1 = { "_id": 1,
-#                 "name": "Tomato",
-#                 "dietary": "",
-#                 "unit": ""}
-
-# ingredient2 = { "_id": 2,
-#                 "name": "Egg",
-#                 "dietary": "vegetarian",
-#                 "unit": ""}
-
-# ingredient3 = { "_id": 3,
-#                 "name": "Salmon",
-#                 "dietary": "pescatarian",
-#                 "unit": "oz"}
-
-# ingredient4 = { "_id": 4,
-#                 "name": "Kale",
-#                 "dietary": "vegan",
-#                 "unit": "cup"}
-
-# collection = userDB["Ingredients"]
-
-# collection.insert_one(ingredient1)
-# collection.insert_one(ingredient2)
-# collection.insert_one(ingredient3)
-# collection.insert_one(ingredient4)
-
-# recipe1 = {
-#         "_id": 10,
-#         "title": "Tomato Salad",
-#         "description": "A simple and refreshing salad that's perfect for summer.",
-#         "ingredients": [
-#         {
-#             "name": "Tomato",
-#             "quantity": 2,
-#             "unit": "units"
-#         },
-#         {
-#             "name": "Cucumber",
-#             "quantity": 1,
-#             "unit": "units"
-#         },
-#         {
-#             "name": "Olive Oil",
-#             "quantity": 1,
-#             "unit": "tablespoon"
-#         },
-#         {
-#             "name": "Balsamic Vinegar",
-#             "quantity": 1,
-#             "unit": "tablespoon"
-#         }
-#     ],
-#     "instructions": [
-#         "Slice the tomatoes and cucumber into bite-sized pieces.",
-#         "Combine the olive oil and balsamic vinegar in a small bowl and whisk to combine.",
-#         "Drizzle the dressing over the tomato and cucumber, tossing to coat.",
-#         "Serve immediately."
-#     ]
-# }
-
-# recipe2 = {
-#     "_id": 11,
-#     "title": "Chicken Alfredo",
-#     "description": "A classic pasta dish that's creamy and comforting.",
-#     "ingredients": [
-#         {
-#             "name": "Pasta",
-#             "quantity": 8,
-#             "unit": "ounces"
-#         },
-#         {
-#             "name": "Chicken Breast",
-#             "quantity": 2,
-#             "unit": "units"
-#         },
-#         {
-#             "name": "Heavy Cream",
-#             "quantity": 1,
-#             "unit": "cup"
-#         },
-#         {
-#             "name": "Parmesan Cheese",
-#             "quantity": 1,
-#             "unit": "cup"
-#         }
-#     ],
-#     "instructions": [
-#         "Cook the pasta according to package instructions.",
-#         "While the pasta cooks, season the chicken with salt and pepper and cook in a skillet over medium heat until no longer pink.",
-#         "Remove the chicken from the skillet and set aside.",
-#         "In the same skillet, add the heavy cream and Parmesan cheese, whisking constantly until the cheese is melted and the sauce is smooth.",
-#         "Add the cooked chicken back to the skillet and toss to coat in the sauce.",
-#         "Serve the chicken and sauce over the cooked pasta."
-#     ]
-# }
-
-# collection = userDB["recipes"]
-
-# collection.insert_one(recipe1)
-# collection.insert_one(recipe2)
-
+global nextRecipeID, nextIngredientID, ingredientListID
+nextIngredientID = int(0)
+nextRecipeID = int(0)
 
 def checkCredentials(_fromDB, _username, _password):
     # Check if the password provided is correct
@@ -136,6 +39,33 @@ def checkCredentials(_fromDB, _username, _password):
         # If password is incorrect, stay at login page
         # print("password incorrect", file=sys.stdout)
         return False
+    
+def generateMealPlan():
+    global userPref
+    
+    toReturn = [None] * 21
+
+    collection = userDB["recipes"]
+    recipes = collection.find({"dietary": userPref})
+
+    print(recipes, file=sys.stdout)
+    # toReturn = random.sample(recipes["_id"], 21)
+
+    return toReturn
+
+
+def getNextRecipeID():
+    global nextRecipeID
+    toReturn = 0
+
+    collection = userDB["recipes"]
+    for x in collection.find({},{ "_id": 1}):
+        # print(x["_id"], file=sys.stdout)
+        if x["_id"] > toReturn:
+            toReturn = x["_id"]
+
+    # print(toReturn, file=sys.stdout)
+    return toReturn + 1
 
 
 # @app.route('/')
@@ -152,8 +82,6 @@ def home():
     collection = userDB["recipes"]
     recipes = collection.find()
     return render_template('home.html', recipes=recipes)
-
-
 
 @app.route('/checkping')
 def checkping(): 
@@ -209,7 +137,6 @@ def search():
     recipes = userDB.recipes.find({"title": {"$regex": query, "$options": "i"}})
     return render_template("recipes.html", recipes=recipes)
 
-
 @app.route("/logout")
 def logout():
     session['logged_in'] = False
@@ -219,54 +146,154 @@ def logout():
 def displayrecipe():
     return render_template("displayrecipe.html", title="Test")
 
+@app.route("/mealplan", methods=['GET', 'POST'])
+def mealplan():
+    if request.method == 'POST':
+        # print('testing', file=sys.stdout)
+        generateMealPlan()
+
+    return render_template("mealplan.html", _mealplan = dummy_mealplan)
 
 @app.route('/createrecipe', methods=['GET', 'POST'])
 def show_createrecipe():
     if request.method == 'POST':
-        name = request.form['name']
-        description = request.form['description']
-        ingredients = request.form['ingredients']
-        steps = request.form['steps']
+        # Which DB queries to recipe collection
+        collection = userDB["ingredients"]
+
+        # Name of the recipe
+        name_raw = request.form['name']
+
+        # Description of the recipe
+        description_raw = request.form['description']
+
+        # String of all quantities, units, and ingredients used seperated by a comma
+        ingredients_raw = request.form['ingredients']
+
+        # Ingredient list with ingredient ID's and not names
+        ingredientListID = []
+
+        # Dietary Preference of the recipe
+        dietary_raw = 'none'
+
+        # Break ingredient string into a list of each comma section
+        # Format QUANTITY-UNIT-INGREDIENT or QUANTITY-INGREDIENT
+        ingredientList = ingredients_raw.split(',') 
+
+        # Current ingredients in the DB
+        currentIngredients = collection.find()
+
+        # If each ingredient element contains 2 elements there is no unit, if 3 there is a unit
+        for ingredient in ingredientList:
+            subIngredient = ingredient.split('-')
+
+            if (len(subIngredient) == 2): # No units provided
+                # Check if ingredient already exists in the DB
+                foundIngredient = collection.find({"name": subIngredient[1]})
+
+                # If ingredient is in the DB, store quantity and ingredient ID
+                ingredientListID.append([int(subIngredient[0]), foundIngredient[0]['_id']])
+            
+            elif (len(subIngredient) == 3): # Units provided
+                # Check if ingredient already exists in the DB
+                foundIngredient = collection.find({"name": subIngredient[2]})
+
+                # If ingredient is in the DB, store quantity and ingredient ID
+                ingredientListID.append([int(subIngredient[0]), foundIngredient[0]['_id']])
+
+                if (foundIngredient[0]['dietary'] == ''):                    
+                    print('none', file=sys.stdout)
+
+                elif (foundIngredient[0]['dietary'] == 'vegetarian'):
+                    if (dietary_raw == 'none'):
+                        dietary_raw = 'vegetarian'                    
+                    # print('vegetarian', file=sys.stdout)
+
+                elif (foundIngredient[0]['dietary'] == 'pescatarian'):
+                    if (dietary_raw == 'none' or dietary_raw == 'vegetarian'):
+                        dietary_raw = 'pescatarian'
+                    # print('pescatarian', file=sys.stdout)
+        
+            else: 
+                print("didnt find item", file=sys.stdout)
+
+        # print(ingredientListID, file=sys.stdout)
+        steps_raw = request.form['steps']
+
+
+        nextRecipeID = getNextRecipeID()
 
         # Store the recipe data in a database
         _recipe = {
-            "_id": 1,
-            "title": name,
-            "description": description,
-            "ingredients": ingredients,
-            "instructions": steps
+            "_id": nextRecipeID,
+            "title": name_raw,
+            "description": description_raw,
+            "ingredients": ingredientListID,
+            "instructions": steps_raw,
+            "dietary": dietary_raw,
         }
 
+        # nextRecipeID = nextRecipeID + 1
         collection = userDB["recipes"]
         collection.insert_one(_recipe)
-
-        return redirect(url_for('show_createrecipe'))
-
+        # return render_template('/displayrecipe/' + str(nextRecipeID))
+        # except:
+        #     print("Error occurred while trying to push new recipe into the DB") 
+        #     return render_template('createrecipe.html')
+        
     return render_template('createrecipe.html')
 
+@app.route('/preferences', methods=['POST', 'GET'])
+def preferences():
+    global userPref
 
+    if request.method == "POST":
+        if request.form['button'] == 'Submit':
+            # print(request.form['user_pref'], file=sys.stdout)
+            userPref = request.form['user_pref']
+            # userPref = 'veg'
+            # print(userPref, file=sys.stdout)
+
+    
+    return render_template('preferences.html', prefs=dieteryprefs)
 
 class Recipe:
-    def __init__(self, recipe_id, name, description, ingredients, steps):
+    def __init__(self, recipe_id, name, description, ingredients, steps, pref):
         self.recipe_id = recipe_id
         self.name = name
         self.description = description
         self.ingredients = ingredients
         self.steps = steps
+        self.pref = pref
 
 # route for displaying a recipe
 @app.route('/displayrecipe/<int:recipe_id>')
 def display_recipe(recipe_id):
-    collection = userDB["recipes"]
+    collection_recipe = userDB["recipes"]
+    collection_ingredient = userDB["ingredients"]
     # retrieve the recipe from the database
-    recipe = collection.find_one({'_id': recipe_id})
+    recipe = collection_recipe.find_one({'_id': recipe_id})
 
     # create a Recipe object
     name = recipe['title']
     description = recipe['description']
-    ingredients = recipe['ingredients']
     steps = recipe['instructions']
-    recipe_obj = Recipe(recipe_id, name, description, ingredients, steps)
+
+    ingredients_raw = recipe['ingredients']
+    ingredients = []
+
+    pref = recipe['dietary']
+
+    for ingredient in ingredients_raw:
+        fromDB = collection_ingredient.find_one({"_id":ingredient[1]})
+        temp_quantity = ingredient[0]
+        temp_unit = fromDB["unit"]
+        temp_name = fromDB["name"]
+        temp = [temp_quantity, temp_unit, temp_name]
+        # print(temp, file=sys.stdout)
+
+        ingredients.append(temp)
+        
+    recipe_obj = Recipe(recipe_id, name, description, ingredients, steps, pref)
 
     # pass the Recipe object to the template
     return render_template('displayrecipe.html', recipe=recipe_obj)
@@ -274,5 +301,73 @@ def display_recipe(recipe_id):
 if __name__ == '__main__': 
     app.run(debug=True)
   
+# Dummy Data
 
 
+
+# myCredentials = { "username": "Max", 
+#                 "password": "123" }
+
+# ingredient0 = { "_id": 0,
+#                 "name": "ingredient0",
+#                 "dietary": "",
+#                 "unit": ""}
+
+# ingredient1 = { "_id": 1,
+#                 "name": "ingredient1",
+#                 "dietary": "",
+#                 "unit": ""}
+
+# ingredient2 = { "_id": 2,
+#                 "name": "ingredient2",
+#                 "dietary": "vegetarian",
+#                 "unit": ""}
+
+# ingredient3 = { "_id": 3,
+#                 "name": "ingredient3",
+#                 "dietary": "pescatarian",
+#                 "unit": "oz"}
+
+# ingredient4 = { "_id": 4,
+#                 "name": "ingredient4",
+#                 "dietary": "vegan",
+#                 "unit": "cup"}
+
+# ingredient5 = { "_id": 5,
+#                 "name": "ingredient5",
+#                 "dietary": "vegetarian",
+#                 "unit": ""}
+
+# ingredient6 = { "_id": 6,
+#                 "name": "ingredient6",
+#                 "dietary": "pescatarian",
+#                 "unit": "oz"}
+
+# ingredient7 = { "_id": 7,
+#                 "name": "ingredient7",
+#                 "dietary": "vegan",
+#                 "unit": "cup"}
+
+# ingredient8 = { "_id": 8,
+#                 "name": "ingredient8",
+#                 "dietary": "",
+#                 "unit": "oz"}
+
+# ingredient9 = { "_id": 9,
+#                 "name": "ingredient9",
+#                 "dietary": "",
+#                 "unit": "cup"}
+
+
+# collection = userDB["ingredients"]
+
+# collection.insert_one(ingredient0)
+# collection.insert_one(ingredient1)
+# collection.insert_one(ingredient2)
+# collection.insert_one(ingredient3)
+# collection.insert_one(ingredient4)
+# collection.insert_one(ingredient5)
+# collection.insert_one(ingredient6)
+# collection.insert_one(ingredient7)
+# collection.insert_one(ingredient8)
+# collection.insert_one(ingredient9)
