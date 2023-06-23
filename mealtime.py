@@ -1,33 +1,51 @@
 from flask import Flask, render_template, request, url_for, redirect, session
 from pymongo.mongo_client import MongoClient
-import sys, random
+import sys, random, requests
 
-# print('This is error output', file=sys.stderr)
-# print('This is standard output', file=sys.stdout)
+# Constants
+URI                 = "mongodb+srv://gmaxgmiles:Qf2xJOsbIP9W8UxO@mealtime-db.sqseaxr.mongodb.net/?retryWrites=true&w=majority"
+APIKEY              = 'c3a2c84bdd684a61b2c9611f766fa65c'
+APISEARCHQ          = 'https://api.spoonacular.com/recipes/complexSearch?apiKey=' + APIKEY + '?query='
+APISEARCHD          = 'https://api.spoonacular.com/recipes/complexSearch?apiKey=' + APIKEY + '&dietary='
+APIGET              = ['https://api.spoonacular.com/recipes/', '/information?apiKey=' + APIKEY]
 
-uri = "mongodb+srv://gmaxgmiles:Qf2xJOsbIP9W8UxO@mealtime-db.sqseaxr.mongodb.net/?retryWrites=true&w=majority"
 
 # Create a new client and connect to the server
-client = MongoClient(uri)
-
+client = MongoClient(URI)
 userDB = client["MealTime"]
 mycol = userDB["users"]
 loggedIn = False;
 app = Flask(__name__)
 app.secret_key = 'your_secret_key_here'
-
 collection_mealplan = userDB["mealplan"]
-
 dummy_mealplan = [None] * 21
 
-
-dieteryprefs = ['none', 'vegetarian', 'pescatarian']
-global userPref 
+global userPref, ingredientListID, mealPlan, ingredientList, nextIngredientID, nextRecipeID, nextUserID
 userPref = 'none'
+dieteryprefs = ['none', 'vegetarian', 'pescatarian'] 
+ingredentList = []
 
-global nextRecipeID, nextIngredientID, ingredientListID
 nextIngredientID = int(0)
 nextRecipeID = int(0)
+nextUserID = int(0)
+
+
+class Recipe:
+    def __init__(self, recipe_id, name, description, ingredients, steps, pref):
+        self.recipe_id = recipe_id
+        self.name = name
+        self.description = description
+        self.ingredients = ingredients
+        self.steps = steps
+        self.pref = pref
+
+class User:
+    def __init__(self, _user_id, _name, _password, _mealplan, _pref):
+        self.user_id = _user_id
+        self.name = _name
+        self.password = _password
+        self.mealplan = _mealplan
+        self.pref = _pref
 
 def checkCredentials(_fromDB, _username, _password):
     # Check if the password provided is correct
@@ -42,18 +60,102 @@ def checkCredentials(_fromDB, _username, _password):
     
 def generateMealPlan():
     global userPref
-    
-    toReturn = [None] * 21
-
     collection = userDB["recipes"]
-    recipes = collection.find({"dietary": userPref})
+    randomRecipes = collection.aggregate([
+        { "$match": {"dietary": userPref} },
+        { "$sample": { "size": 21 } }
+    ])
 
-    print(recipes, file=sys.stdout)
-    # toReturn = random.sample(recipes["_id"], 21)
+    toReturn = []
 
+    for meal in randomRecipes:
+        toReturn.append(meal)
+
+    while toReturn.__len__() < 21:
+        index = random.randint(0, toReturn.__len__() - 1)
+        toReturn.append(toReturn[index])
+    
     return toReturn
 
+def generateMealPlanWithAPI():
+    global userPref
+    totalEntries = getRecipeByDietary(userPref).get('results')
+    print(type(totalEntries))
+    return random.choices(totalEntries, k=21)
 
+
+def createUser(_name, _password, _mealplan, _pref):
+    global nextUserID
+    collection = userDB["users"]
+
+    if (collection.count_documents({}) < 1):
+        # print('empty user collection', file=sys.stdout)
+        nextUserID = 1
+        firstUser = User(nextUserID, _name, _password, dummy_mealplan, _pref)
+    
+    else: 
+        nextUserID = collection.find().sort("_id", -1).limit(1)[0]["_id"] + 1
+        
+    _user = {
+            "_id": nextUserID,
+            "name": _name,
+            "password": _password,
+            "mealplan": dummy_mealplan,
+            "dietary": _pref,
+        }
+    collection.insert_one(_user)
+    
+    # highestID = userDB.collection.find().sort({":_id": -1}).limit(1)
+
+
+def getRecipeByKeyword(_keyword):
+    return requests.get(APISEARCHQ + _keyword + '&number=1').json()
+
+
+def getRecipeByDietary(_dietary):
+    # toReturn = []
+
+    # breakfast_options   = requests.get(APISEARCHD + _dietary + '&number=100&type=breakfast').json()
+    # lunch_options       = requests.get(APISEARCHD + _dietary + '&number=100&type=breakfast').json()
+    # dinner_options      = requests.get(APISEARCHD + _dietary + '&number=100&type=breakfast').json()
+
+    # toReturn.append(breakfast_options.get('results'))
+    # toReturn.append(lunch_options.get('results'))
+    # toReturn.append(dinner_options.get('results'))
+    # return toReturn
+    return requests.get(APISEARCHD + _dietary + '&number=250').json()
+
+
+def getRecipeDetails(_recipeID):
+    # Search by Recipe ID
+    # '782585' = Recipe ID
+    # response = requests.get(APIGET[0] + '782585' + APIGET[1])
+    details_results = requests.get(APIGET[0] + str(_recipeID) + APIGET[1])
+    details_results = details_results.json()
+    del details_results['veryHealthy']
+    del details_results['cheap']
+    del details_results['veryPopular']
+    del details_results['sustainable']
+    del details_results['lowFodmap']
+    del details_results['weightWatcherSmartPoints']
+    del details_results['gaps']
+    del details_results['preparationMinutes']
+    del details_results['cookingMinutes']
+    del details_results['healthScore']
+    del details_results['creditsText']
+    del details_results['sourceName']
+    del details_results['pricePerServing']
+    del details_results['readyInMinutes']
+    del details_results['image']
+    del details_results['imageType']
+    del details_results['occasions']
+    del details_results['winePairing']
+    del details_results['analyzedInstructions']
+    del details_results['spoonacularSourceUrl']
+    return details_results
+
+
+# Helper function to check what the last recipe ID was and add one
 def getNextRecipeID():
     global nextRecipeID
     toReturn = 0
@@ -68,28 +170,39 @@ def getNextRecipeID():
     return toReturn + 1
 
 
-# @app.route('/')
-# def home():
-#     if 'logged_in' in session and session['logged_in']:
-#         # User is logged in
-#         return redirect(url_for("user", usr=user))
-#     else:
-#         # User is not logged in
-#         return redirect(url_for("login"))
+# Helper method to check what the dietary restrictions are of the passed in variable
+def checkDietary(_ingredient):
+    toReturn = 'none'
+
+    if (_ingredient[0]['dietary'] == ''):                    
+        print('none', file=sys.stdout)
+
+    elif (_ingredient[0]['dietary'] == 'vegetarian'):
+        if (toReturn == 'none'):
+            toReturn = 'vegetarian'                    
+            # print('vegetarian', file=sys.stdout)
+
+    elif (_ingredient[0]['dietary'] == 'pescatarian'):
+        if (toReturn == 'none' or toReturn == 'vegetarian'):
+            toReturn = 'pescatarian'
+            # print('pescatarian', file=sys.stdout)
+
+    return toReturn
+
+
+# Helper method to compile how much of each ingredient is needed
+def getIngredients():
+    toReturn = []
+
+    return toReturn
+
 
 @app.route('/')
 def home():
-    collection = userDB["recipes"]
-    recipes = collection.find()
-    return render_template('home.html', recipes=recipes)
+    global mealPlan
+    mealPlan = dummy_mealplan
 
-@app.route('/checkping')
-def checkping(): 
-    try:
-        client.admin.command('ping')
-        return 'Pinged your deployment. You successfully connected to MongoDB!'
-    except Exception as e:
-        return e
+    return render_template('home.html')
 
 @app.route("/login", methods=["POST", "GET"])
 def login():
@@ -148,11 +261,29 @@ def displayrecipe():
 
 @app.route("/mealplan", methods=['GET', 'POST'])
 def mealplan():
-    if request.method == 'POST':
-        # print('testing', file=sys.stdout)
-        generateMealPlan()
+    global mealPlan
+    user = userDB["users"].find_one( {"_id": 1} )
+    mealPlan = user["mealplan"]
 
-    return render_template("mealplan.html", _mealplan = dummy_mealplan)
+    if request.method == 'POST':
+        mealPlan = generateMealPlan()
+        userDB["users"].update_one( {"_id": 1} , { "$set": { 'mealplan': mealPlan } })
+
+
+    return render_template("mealplan.html", _mealplan = mealPlan)
+
+@app.route("/mealplanapi", methods=['GET', 'POST'])
+def mealplanapi():
+    global mealPlan
+    # user = userDB["users"].find_one( {"_id": 1} )
+    # mealPlan = user["mealplan"]
+    mealPlan = dummy_mealplan
+
+    if request.method == 'POST':
+        mealPlan = generateMealPlanWithAPI()
+        return render_template("mealplanapi.html", mealplan = mealPlan)
+
+    return render_template("mealplanapi.html", mealplan = mealPlan)
 
 @app.route('/createrecipe', methods=['GET', 'POST'])
 def show_createrecipe():
@@ -179,19 +310,21 @@ def show_createrecipe():
         # Format QUANTITY-UNIT-INGREDIENT or QUANTITY-INGREDIENT
         ingredientList = ingredients_raw.split(',') 
 
-        # Current ingredients in the DB
-        currentIngredients = collection.find()
-
         # If each ingredient element contains 2 elements there is no unit, if 3 there is a unit
         for ingredient in ingredientList:
             subIngredient = ingredient.split('-')
 
             if (len(subIngredient) == 2): # No units provided
+
                 # Check if ingredient already exists in the DB
                 foundIngredient = collection.find({"name": subIngredient[1]})
 
                 # If ingredient is in the DB, store quantity and ingredient ID
                 ingredientListID.append([int(subIngredient[0]), foundIngredient[0]['_id']])
+
+                dietary_raw = checkDietary(foundIngredient)
+
+
             
             elif (len(subIngredient) == 3): # Units provided
                 # Check if ingredient already exists in the DB
@@ -200,25 +333,13 @@ def show_createrecipe():
                 # If ingredient is in the DB, store quantity and ingredient ID
                 ingredientListID.append([int(subIngredient[0]), foundIngredient[0]['_id']])
 
-                if (foundIngredient[0]['dietary'] == ''):                    
-                    print('none', file=sys.stdout)
-
-                elif (foundIngredient[0]['dietary'] == 'vegetarian'):
-                    if (dietary_raw == 'none'):
-                        dietary_raw = 'vegetarian'                    
-                    # print('vegetarian', file=sys.stdout)
-
-                elif (foundIngredient[0]['dietary'] == 'pescatarian'):
-                    if (dietary_raw == 'none' or dietary_raw == 'vegetarian'):
-                        dietary_raw = 'pescatarian'
-                    # print('pescatarian', file=sys.stdout)
+                dietary_raw = checkDietary(ingredient)
         
             else: 
                 print("didnt find item", file=sys.stdout)
 
         # print(ingredientListID, file=sys.stdout)
         steps_raw = request.form['steps']
-
 
         nextRecipeID = getNextRecipeID()
 
@@ -256,15 +377,6 @@ def preferences():
     
     return render_template('preferences.html', prefs=dieteryprefs)
 
-class Recipe:
-    def __init__(self, recipe_id, name, description, ingredients, steps, pref):
-        self.recipe_id = recipe_id
-        self.name = name
-        self.description = description
-        self.ingredients = ingredients
-        self.steps = steps
-        self.pref = pref
-
 # route for displaying a recipe
 @app.route('/displayrecipe/<int:recipe_id>')
 def display_recipe(recipe_id):
@@ -298,76 +410,21 @@ def display_recipe(recipe_id):
     # pass the Recipe object to the template
     return render_template('displayrecipe.html', recipe=recipe_obj)
 
+@app.route("/shoppinglist")
+def shoppinglist():
+
+    return render_template("shoppinglist.html")
+
 if __name__ == '__main__': 
     app.run(debug=True)
   
-# Dummy Data
 
 
-
-# myCredentials = { "username": "Max", 
-#                 "password": "123" }
-
-# ingredient0 = { "_id": 0,
-#                 "name": "ingredient0",
-#                 "dietary": "",
-#                 "unit": ""}
-
-# ingredient1 = { "_id": 1,
-#                 "name": "ingredient1",
-#                 "dietary": "",
-#                 "unit": ""}
-
-# ingredient2 = { "_id": 2,
-#                 "name": "ingredient2",
-#                 "dietary": "vegetarian",
-#                 "unit": ""}
-
-# ingredient3 = { "_id": 3,
-#                 "name": "ingredient3",
-#                 "dietary": "pescatarian",
-#                 "unit": "oz"}
-
-# ingredient4 = { "_id": 4,
-#                 "name": "ingredient4",
-#                 "dietary": "vegan",
-#                 "unit": "cup"}
-
-# ingredient5 = { "_id": 5,
-#                 "name": "ingredient5",
-#                 "dietary": "vegetarian",
-#                 "unit": ""}
-
-# ingredient6 = { "_id": 6,
-#                 "name": "ingredient6",
-#                 "dietary": "pescatarian",
-#                 "unit": "oz"}
-
-# ingredient7 = { "_id": 7,
-#                 "name": "ingredient7",
-#                 "dietary": "vegan",
-#                 "unit": "cup"}
-
-# ingredient8 = { "_id": 8,
-#                 "name": "ingredient8",
-#                 "dietary": "",
-#                 "unit": "oz"}
-
-# ingredient9 = { "_id": 9,
-#                 "name": "ingredient9",
-#                 "dietary": "",
-#                 "unit": "cup"}
-
-
-# collection = userDB["ingredients"]
-
-# collection.insert_one(ingredient0)
-# collection.insert_one(ingredient1)
-# collection.insert_one(ingredient2)
-# collection.insert_one(ingredient3)
-# collection.insert_one(ingredient4)
-# collection.insert_one(ingredient5)
-# collection.insert_one(ingredient6)
-# collection.insert_one(ingredient7)
-# collection.insert_one(ingredient8)
-# collection.insert_one(ingredient9)
+# @app.route('/')
+# def home():
+#     if 'logged_in' in session and session['logged_in']:
+#         # User is logged in
+#         return redirect(url_for("user", usr=user))
+#     else:
+#         # User is not logged in
+#         return redirect(url_for("login"))
